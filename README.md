@@ -15,48 +15,45 @@ Tài liệu này hướng dẫn cách sử dụng hai script setup_server.sh và
 
 ### Bước 1: Cấu hình trên máy chủ (Server)
 
-1. Chạy script setup_server.sh trên máy chủ:
+1. Chạy script `setup_server.sh` trên máy chủ:
    ./setup_server.sh
 
    Sau khi chạy, script sẽ:
-   - Tạo ra các file khóa: server_private.key, server_public.key
-   - Tạo ra file cấu hình: wg0.conf (cấu hình giao diện và thiết lập các luật iptables chuyển tiếp traffic qua card mạng mặc định)
-   - Hiển thị khóa công khai của Server (Server Public Key) trên màn hình. Hãy lưu lại khóa này để dùng cấu hình cho máy khách.
-   - Tự động sao chép cấu hình vào `/etc/wireguard/` và khởi động WireGuard ngay lập tức bằng quyền sudo.
+   - Tạo ra các tệp khóa của Server (`server_private.key`, `server_public.key`).
+   - Tạo ra cấu hình máy chủ `wg0.conf` có sẵn phần khai báo peer `Client1 EdgeNode` với IP `10.8.0.2/32` (Khóa công khai của client tạm thời được gán bằng giá trị placeholder).
+   - Tự động sao chép cấu hình `wg0.conf` vào `/etc/wireguard/` và khởi động WireGuard ngay lập tức bằng quyền sudo.
 
 2. Mở cổng (Port Forwarding) trên Modem/Router:
    - Đăng nhập vào giao diện quản lý modem/router của nhà mạng.
    - Cấu hình Port Forwarding cổng UDP 51820 trỏ về địa chỉ IP LAN của máy chủ.
 
-### Bước 2: Cấu hình trên máy khách (Client) và tự động trao đổi khóa
+### Bước 2: Cấu hình trên máy khách (Client) và đăng ký khóa
 
-1. Chạy script `setup_client.sh` trên máy khách. Bạn có thể truyền thêm SSH user và SSH port của Server để script tự động thực hiện trao đổi khóa (đăng ký Client Peer lên Server):
+1. Chạy script `setup_client.sh` trên máy khách. Bạn truyền thêm địa chỉ IP công khai của Server, Server Public Key, và (tùy chọn) thông tin SSH để tự động đồng bộ khóa lên máy chủ:
    ./setup_client.sh <server_public_ip_or_domain> <server_public_key> [server_ssh_user] [server_ssh_port]
 
    Ví dụ (tự động đăng ký qua SSH):
    ./setup_client.sh 203.0.113.5 abcdef1234567890... hiengyen 22
 
    Sau khi chạy, script sẽ:
-   - Tạo ra các khóa cho client: client_private.key, client_public.key
-   - Tạo ra file cấu hình: client_wg0.conf (với địa chỉ IP tĩnh 10.8.0.2/32, MTU=1280, DNS=1.1.1.1, ListenPort=51820)
-   - Tự động SSH vào máy chủ để thêm thông tin cấu hình Client (Public Key) vào `/etc/wireguard/wg0.conf` của máy chủ và nạp lại cấu hình (nếu bạn cung cấp SSH credentials hoặc đồng ý chạy).
-   - Tự động sao chép file cấu hình client_wg0.conf vào thư mục `/etc/wireguard/` và kích hoạt kết nối VPN trên máy khách bằng quyền sudo.
+   - Tạo khóa và cấu hình `client_wg0.conf` mới cho máy khách sử dụng IP tĩnh `10.8.0.2/32` (và các thông số DNS=1.1.1.1, ListenPort=51820).
+   - Tự động SSH vào máy chủ để thay thế khóa công khai thực tế của client vào block cấu hình `Client1 EdgeNode` đã tạo ở Bước 1 và tải lại cấu hình server.
+   - Tự động sao chép file cấu hình client_wg0.conf vào thư mục `/etc/wireguard/` và kích hoạt kết nối VPN bằng quyền sudo.
 
-### Bước 3: Đăng ký Client với Server (Nếu không tự động đăng ký qua SSH ở Bước 2)
+### Bước 3: Đăng ký khóa thủ công (Nếu không tự động đồng bộ qua SSH ở Bước 2)
 
-Nếu không sử dụng tính năng tự động trao đổi khóa qua SSH ở Bước 2, bạn cần làm thủ công:
-1. Quay lại máy chủ (Server), mở file cấu hình /etc/wireguard/wg0.conf để chỉnh sửa:
+Nếu chọn không đồng bộ khóa tự động qua SSH ở Bước 2, bạn cần cập nhật thủ công trên máy chủ:
+1. Quay lại máy chủ (Server), mở file cấu hình `/etc/wireguard/wg0.conf` để chỉnh sửa:
    sudo nano /etc/wireguard/wg0.conf
 
-2. Dán đoạn cấu hình [Peer] của Client (in ra ở cuối Bước 2) vào cuối file:
+2. Tìm đoạn cấu hình `[Peer]` của `Client1 EdgeNode` và dán khóa công khai của client (được in ra ở cuối Bước 2) vào phần `PublicKey`:
    [Peer]
    # Client1  EdgeNode
    PublicKey  = <KHOA_CONG_KHAI_CUA_CLIENT>
    AllowedIPs = 10.8.0.2/32
 
-3. Lưu file và tải lại cấu hình trên máy chủ để áp dụng thay đổi:
-   sudo wg-quick down wg0
-   sudo wg-quick up wg0
+3. Tải lại cấu hình trên máy chủ để áp dụng thay đổi:
+   sudo wg syncconf wg0 <(sudo wg-quick strip wg0)
 
 ### Bước 4: Kiểm tra kết nối từ Client
 

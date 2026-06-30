@@ -1,5 +1,27 @@
 #!/bin/bash
-# Script to setup WireGuard Client
+WG_IFACE="wg0"
+
+# Check if wireguard is installed
+if ! command -v wg &> /dev/null; then
+    echo "WireGuard is not installed. Please install it first."
+    exit 1
+fi
+
+# If config already exists, just install it and exit
+if [ -f "client_${WG_IFACE}.conf" ]; then
+    echo "======================================"
+    echo "    WireGuard Client Setup Script"
+    echo "======================================"
+    echo "[*] Found existing client_${WG_IFACE}.conf configuration."
+    echo "[*] Copying configuration to /etc/wireguard/..."
+    sudo cp client_${WG_IFACE}.conf /etc/wireguard/
+    sudo chmod 600 /etc/wireguard/client_${WG_IFACE}.conf
+    echo "[*] Starting the WireGuard client interface..."
+    sudo wg-quick up client_${WG_IFACE}
+    echo "Once connected, you can SSH into the server using: ssh user@10.8.0.1"
+    echo "======================================"
+    exit 0
+fi
 
 if [ "$#" -lt 2 ]; then
     echo "Usage: $0 <server_public_ip_or_domain> <server_public_key> [server_ssh_user] [server_ssh_port]"
@@ -13,20 +35,9 @@ SERVER_SSH_USER=$3
 SERVER_SSH_PORT=${4:-22}
 
 # Configuration variables
-WG_IFACE="wg0"
 WG_IP="10.8.0.2/32"
 WG_PORT="51820"
 ALLOWED_IPS="10.8.0.0/24" # Set to 0.0.0.0/0 to route all traffic through VPN
-
-echo "======================================"
-echo "    WireGuard Client Setup Script"
-echo "======================================"
-
-# Check if wireguard is installed
-if ! command -v wg &> /dev/null; then
-    echo "WireGuard is not installed. Please install it first."
-    exit 1
-fi
 
 echo "[*] Generating Client Keys..."
 wg genkey | tee client_private.key | wg pubkey > client_public.key
@@ -39,7 +50,6 @@ cat <<EOF > client_${WG_IFACE}.conf
 PrivateKey = ${CLIENT_PRIV_KEY}
 Address = ${WG_IP}
 ListenPort = 51820
-MTU = 1280
 DNS = 1.1.1.1
 
 [Peer]
@@ -55,14 +65,7 @@ echo ""
 REGISTRATION_SUCCESS=false
 if [ -n "$SERVER_SSH_USER" ]; then
     echo "[*] Automatically registering client on server via SSH..."
-    ssh -p "$SERVER_SSH_PORT" -t "${SERVER_SSH_USER}@${SERVER_ENDPOINT}" "sudo bash -c 'cat >> /etc/wireguard/wg0.conf <<EOF
-
-[Peer]
-# Client1  EdgeNode
-PublicKey  = ${CLIENT_PUB_KEY}
-AllowedIPs = ${WG_IP}
-EOF
-wg syncconf wg0 <(wg-quick strip wg0)'"
+    ssh -p "$SERVER_SSH_PORT" -t "${SERVER_SSH_USER}@${SERVER_ENDPOINT}" "sudo sed -i '/# Client1  EdgeNode/,/AllowedIPs = ${WG_IP/\//\\\/}/ s|PublicKey  =.*|PublicKey  = ${CLIENT_PUB_KEY}|' /etc/wireguard/wg0.conf && sudo wg syncconf wg0 <(sudo wg-quick strip wg0)"
     if [ $? -eq 0 ]; then
         REGISTRATION_SUCCESS=true
         echo "[*] Successfully registered client on server!"
@@ -75,32 +78,22 @@ else
         read -p "Enter SSH username for server (${SERVER_ENDPOINT}): " SERVER_SSH_USER
         read -p "Enter SSH port [22]: " SERVER_SSH_PORT
         SERVER_SSH_PORT=${SERVER_SSH_PORT:-22}
-        ssh -p "$SERVER_SSH_PORT" -t "${SERVER_SSH_USER}@${SERVER_ENDPOINT}" "sudo bash -c 'cat >> /etc/wireguard/wg0.conf <<EOF
-
-[Peer]
-# Client1  EdgeNode
-PublicKey  = ${CLIENT_PUB_KEY}
-AllowedIPs = ${WG_IP}
-EOF
-wg syncconf wg0 <(wg-quick strip wg0)'"
+        ssh -p "$SERVER_SSH_PORT" -t "${SERVER_SSH_USER}@${SERVER_ENDPOINT}" "sudo sed -i '/# Client1  EdgeNode/,/AllowedIPs = ${WG_IP/\//\\\/}/ s|PublicKey  =.*|PublicKey  = ${CLIENT_PUB_KEY}|' /etc/wireguard/wg0.conf && sudo wg syncconf wg0 <(sudo wg-quick strip wg0)"
         if [ $? -eq 0 ]; then
             REGISTRATION_SUCCESS=true
             echo "[*] Successfully registered client on server!"
         else
-            echo "[!] Failed to register client. You will need to add it manually."
+            echo "[!] Failed to register client. You will need to update it manually."
         fi
     fi
 fi
 
 if [ "$REGISTRATION_SUCCESS" = false ]; then
-    echo "IMPORTANT: You must manually add this client to the server's configuration."
-    echo "Run the following on the SERVER or append to server's wg0.conf:"
-    echo "
-[Peer]
-# Client1  EdgeNode
-PublicKey  = ${CLIENT_PUB_KEY}
-AllowedIPs = ${WG_IP}
-"
+    echo "IMPORTANT: You must manually update this client's public key on the server's /etc/wireguard/wg0.conf."
+    echo "Find the [Peer] block for Client1 EdgeNode and set:"
+    echo "PublicKey  = ${CLIENT_PUB_KEY}"
+    echo ""
+    echo "Then reload configuration on the server: sudo wg syncconf wg0 <(sudo wg-quick strip wg0)"
 fi
 
 echo "[*] Copying configuration to /etc/wireguard/..."

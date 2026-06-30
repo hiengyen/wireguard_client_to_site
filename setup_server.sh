@@ -40,6 +40,10 @@ PostDown = iptables -D FORWARD -i ${DEFAULT_ROUTE_IFACE} -o ${WG_IFACE} -m state
 PostDown = iptables -t nat -D POSTROUTING -o ${DEFAULT_ROUTE_IFACE} -j MASQUERADE
 
 # Add peers below
+[Peer]
+# Client1  EdgeNode
+PublicKey  = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+AllowedIPs = 10.8.0.2/32
 EOF
 
 echo "[*] Server setup complete!"
