@@ -28,26 +28,27 @@ Tài liệu này hướng dẫn cách sử dụng hai script setup_server.sh và
    - Đăng nhập vào giao diện quản lý modem/router của nhà mạng.
    - Cấu hình Port Forwarding cổng UDP 51820 trỏ về địa chỉ IP LAN của máy chủ.
 
-### Bước 2: Cấu hình trên máy khách (Client)
+### Bước 2: Cấu hình trên máy khách (Client) và tự động trao đổi khóa
 
-1. Chạy script setup_client.sh trên máy khách với 2 tham số: Địa chỉ IP công khai (hoặc tên miền) của máy chủ và khóa công khai của máy chủ (Server Public Key) lấy từ Bước 1.
-   ./setup_client.sh <server_public_ip_or_domain> <server_public_key>
+1. Chạy script `setup_client.sh` trên máy khách. Bạn có thể truyền thêm SSH user và SSH port của Server để script tự động thực hiện trao đổi khóa (đăng ký Client Peer lên Server):
+   ./setup_client.sh <server_public_ip_or_domain> <server_public_key> [server_ssh_user] [server_ssh_port]
 
-   Ví dụ:
-   ./setup_client.sh 203.0.113.5 abcdef1234567890...
+   Ví dụ (tự động đăng ký qua SSH):
+   ./setup_client.sh 203.0.113.5 abcdef1234567890... hiengyen 22
 
    Sau khi chạy, script sẽ:
    - Tạo ra các khóa cho client: client_private.key, client_public.key
    - Tạo ra file cấu hình: client_wg0.conf
-   - In ra màn hình khối cấu hình dạng [Peer] chứa khóa công khai của máy khách. Hãy sao chép khối thông tin này để đăng ký với Server ở bước sau.
+   - Tự động SSH vào máy chủ để thêm thông tin cấu hình Client (Public Key) vào `/etc/wireguard/wg0.conf` của máy chủ và nạp lại cấu hình (nếu bạn cung cấp SSH credentials hoặc đồng ý chạy).
    - Tự động sao chép file cấu hình client_wg0.conf vào thư mục `/etc/wireguard/` và kích hoạt kết nối VPN trên máy khách bằng quyền sudo.
 
-### Bước 3: Đăng ký Client với Server
+### Bước 3: Đăng ký Client với Server (Nếu không tự động đăng ký qua SSH ở Bước 2)
 
+Nếu không sử dụng tính năng tự động trao đổi khóa qua SSH ở Bước 2, bạn cần làm thủ công:
 1. Quay lại máy chủ (Server), mở file cấu hình /etc/wireguard/wg0.conf để chỉnh sửa:
    sudo nano /etc/wireguard/wg0.conf
 
-2. Dán đoạn cấu hình [Peer] của Client (vừa copy ở cuối Bước 2) vào cuối file:
+2. Dán đoạn cấu hình [Peer] của Client (in ra ở cuối Bước 2) vào cuối file:
    [Peer]
    PublicKey = <KHOA_CONG_KHAI_CUA_CLIENT>
    AllowedIPs = 10.8.0.2/32

@@ -1,14 +1,16 @@
 #!/bin/bash
 # Script to setup WireGuard Client
 
-if [ "$#" -ne 2 ]; then
-    echo "Usage: $0 <server_public_ip_or_domain> <server_public_key>"
-    echo "Example: $0 203.0.113.5 <server_pub_key>"
+if [ "$#" -lt 2 ]; then
+    echo "Usage: $0 <server_public_ip_or_domain> <server_public_key> [server_ssh_user] [server_ssh_port]"
+    echo "Example: $0 203.0.113.5 <server_pub_key> hiengyen 22"
     exit 1
 fi
 
 SERVER_ENDPOINT=$1
 SERVER_PUB_KEY=$2
+SERVER_SSH_USER=$3
+SERVER_SSH_PORT=${4:-22}
 
 # Configuration variables
 WG_IFACE="wg0"
@@ -46,13 +48,54 @@ EOF
 
 echo "[*] Client setup complete!"
 echo ""
-echo "IMPORTANT: You must add this client to the server's configuration."
-echo "Run the following on the SERVER or append to server's wg0.conf:"
-echo "
+
+REGISTRATION_SUCCESS=false
+if [ -n "$SERVER_SSH_USER" ]; then
+    echo "[*] Automatically registering client on server via SSH..."
+    ssh -p "$SERVER_SSH_PORT" -t "${SERVER_SSH_USER}@${SERVER_ENDPOINT}" "sudo bash -c 'cat >> /etc/wireguard/wg0.conf <<EOF
+
 [Peer]
 PublicKey = ${CLIENT_PUB_KEY}
-AllowedIPs = 10.8.0.2/32
+AllowedIPs = ${WG_IP%/24}/32
+EOF
+wg syncconf wg0 <(wg-quick strip wg0)'"
+    if [ $? -eq 0 ]; then
+        REGISTRATION_SUCCESS=true
+        echo "[*] Successfully registered client on server!"
+    else
+        echo "[!] Failed to automatically register client via SSH."
+    fi
+else
+    read -p "Do you want to automatically register this client on the server via SSH? (y/n): " ssh_confirm
+    if [[ $ssh_confirm =~ ^[Yy]$ ]]; then
+        read -p "Enter SSH username for server (${SERVER_ENDPOINT}): " SERVER_SSH_USER
+        read -p "Enter SSH port [22]: " SERVER_SSH_PORT
+        SERVER_SSH_PORT=${SERVER_SSH_PORT:-22}
+        ssh -p "$SERVER_SSH_PORT" -t "${SERVER_SSH_USER}@${SERVER_ENDPOINT}" "sudo bash -c 'cat >> /etc/wireguard/wg0.conf <<EOF
+
+[Peer]
+PublicKey = ${CLIENT_PUB_KEY}
+AllowedIPs = ${WG_IP%/24}/32
+EOF
+wg syncconf wg0 <(wg-quick strip wg0)'"
+        if [ $? -eq 0 ]; then
+            REGISTRATION_SUCCESS=true
+            echo "[*] Successfully registered client on server!"
+        else
+            echo "[!] Failed to register client. You will need to add it manually."
+        fi
+    fi
+fi
+
+if [ "$REGISTRATION_SUCCESS" = false ]; then
+    echo "IMPORTANT: You must manually add this client to the server's configuration."
+    echo "Run the following on the SERVER or append to server's wg0.conf:"
+    echo "
+[Peer]
+PublicKey = ${CLIENT_PUB_KEY}
+AllowedIPs = ${WG_IP%/24}/32
 "
+fi
 
 echo "[*] Copying configuration to /etc/wireguard/..."
 sudo cp client_${WG_IFACE}.conf /etc/wireguard/
