@@ -20,7 +20,7 @@ Tài liệu này hướng dẫn cách sử dụng hai script setup_server.sh và
 
    Sau khi chạy, script sẽ:
    - Tạo ra các file khóa: server_private.key, server_public.key
-   - Tạo ra file cấu hình: wg0.conf
+   - Tạo ra file cấu hình: wg0.conf (cấu hình giao diện và thiết lập các luật iptables chuyển tiếp traffic qua card mạng mặc định)
    - Hiển thị khóa công khai của Server (Server Public Key) trên màn hình. Hãy lưu lại khóa này để dùng cấu hình cho máy khách.
    - Tự động sao chép cấu hình vào `/etc/wireguard/` và khởi động WireGuard ngay lập tức bằng quyền sudo.
 
@@ -38,7 +38,7 @@ Tài liệu này hướng dẫn cách sử dụng hai script setup_server.sh và
 
    Sau khi chạy, script sẽ:
    - Tạo ra các khóa cho client: client_private.key, client_public.key
-   - Tạo ra file cấu hình: client_wg0.conf
+   - Tạo ra file cấu hình: client_wg0.conf (với địa chỉ IP tĩnh 10.8.0.2/32, MTU=1280, DNS=1.1.1.1, ListenPort=51820)
    - Tự động SSH vào máy chủ để thêm thông tin cấu hình Client (Public Key) vào `/etc/wireguard/wg0.conf` của máy chủ và nạp lại cấu hình (nếu bạn cung cấp SSH credentials hoặc đồng ý chạy).
    - Tự động sao chép file cấu hình client_wg0.conf vào thư mục `/etc/wireguard/` và kích hoạt kết nối VPN trên máy khách bằng quyền sudo.
 
@@ -50,7 +50,8 @@ Nếu không sử dụng tính năng tự động trao đổi khóa qua SSH ở 
 
 2. Dán đoạn cấu hình [Peer] của Client (in ra ở cuối Bước 2) vào cuối file:
    [Peer]
-   PublicKey = <KHOA_CONG_KHAI_CUA_CLIENT>
+   # Client1  EdgeNode
+   PublicKey  = <KHOA_CONG_KHAI_CUA_CLIENT>
    AllowedIPs = 10.8.0.2/32
 
 3. Lưu file và tải lại cấu hình trên máy chủ để áp dụng thay đổi:

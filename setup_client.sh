@@ -14,7 +14,7 @@ SERVER_SSH_PORT=${4:-22}
 
 # Configuration variables
 WG_IFACE="wg0"
-WG_IP="10.8.0.2/24"
+WG_IP="10.8.0.2/32"
 WG_PORT="51820"
 ALLOWED_IPS="10.8.0.0/24" # Set to 0.0.0.0/0 to route all traffic through VPN
 
@@ -36,8 +36,11 @@ CLIENT_PUB_KEY=$(cat client_public.key)
 echo "[*] Creating Client Configuration (client_${WG_IFACE}.conf)..."
 cat <<EOF > client_${WG_IFACE}.conf
 [Interface]
-Address = ${WG_IP}
 PrivateKey = ${CLIENT_PRIV_KEY}
+Address = ${WG_IP}
+ListenPort = 51820
+MTU = 1280
+DNS = 1.1.1.1
 
 [Peer]
 PublicKey = ${SERVER_PUB_KEY}
@@ -55,8 +58,9 @@ if [ -n "$SERVER_SSH_USER" ]; then
     ssh -p "$SERVER_SSH_PORT" -t "${SERVER_SSH_USER}@${SERVER_ENDPOINT}" "sudo bash -c 'cat >> /etc/wireguard/wg0.conf <<EOF
 
 [Peer]
-PublicKey = ${CLIENT_PUB_KEY}
-AllowedIPs = ${WG_IP%/24}/32
+# Client1  EdgeNode
+PublicKey  = ${CLIENT_PUB_KEY}
+AllowedIPs = ${WG_IP}
 EOF
 wg syncconf wg0 <(wg-quick strip wg0)'"
     if [ $? -eq 0 ]; then
@@ -74,8 +78,9 @@ else
         ssh -p "$SERVER_SSH_PORT" -t "${SERVER_SSH_USER}@${SERVER_ENDPOINT}" "sudo bash -c 'cat >> /etc/wireguard/wg0.conf <<EOF
 
 [Peer]
-PublicKey = ${CLIENT_PUB_KEY}
-AllowedIPs = ${WG_IP%/24}/32
+# Client1  EdgeNode
+PublicKey  = ${CLIENT_PUB_KEY}
+AllowedIPs = ${WG_IP}
 EOF
 wg syncconf wg0 <(wg-quick strip wg0)'"
         if [ $? -eq 0 ]; then
@@ -92,8 +97,9 @@ if [ "$REGISTRATION_SUCCESS" = false ]; then
     echo "Run the following on the SERVER or append to server's wg0.conf:"
     echo "
 [Peer]
-PublicKey = ${CLIENT_PUB_KEY}
-AllowedIPs = ${WG_IP%/24}/32
+# Client1  EdgeNode
+PublicKey  = ${CLIENT_PUB_KEY}
+AllowedIPs = ${WG_IP}
 "
 fi
 

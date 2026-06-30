@@ -6,6 +6,7 @@ WG_IFACE="wg0"
 WG_PORT="51820"
 WG_IP="10.8.0.1/24"
 DEFAULT_ROUTE_IFACE=$(ip route ls default | awk '{print $5}')
+DEFAULT_ROUTE_IFACE=${DEFAULT_ROUTE_IFACE:-ens5}
 
 echo "======================================"
 echo "    WireGuard Server Setup Script"
@@ -29,12 +30,16 @@ Address = ${WG_IP}
 ListenPort = ${WG_PORT}
 PrivateKey = ${SERVER_PRIV_KEY}
 
-# Enable IP forwarding and setup NAT
 PostUp = sysctl -w net.ipv4.ip_forward=1
-PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -t nat -A POSTROUTING -o ${DEFAULT_ROUTE_IFACE} -j MASQUERADE
-PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -t nat -D POSTROUTING -o ${DEFAULT_ROUTE_IFACE} -j MASQUERADE
+PostUp = iptables -A FORWARD -i ${WG_IFACE} -o ${DEFAULT_ROUTE_IFACE} -j ACCEPT
+PostUp = iptables -A FORWARD -i ${DEFAULT_ROUTE_IFACE} -o ${WG_IFACE} -m state --state ESTABLISHED,RELATED -j ACCEPT
+PostUp = iptables -t nat -A POSTROUTING -o ${DEFAULT_ROUTE_IFACE} -j MASQUERADE
 
-# Client peers will be appended below here.
+PostDown = iptables -D FORWARD -i ${WG_IFACE} -o ${DEFAULT_ROUTE_IFACE} -j ACCEPT
+PostDown = iptables -D FORWARD -i ${DEFAULT_ROUTE_IFACE} -o ${WG_IFACE} -m state --state ESTABLISHED,RELATED -j ACCEPT
+PostDown = iptables -t nat -D POSTROUTING -o ${DEFAULT_ROUTE_IFACE} -j MASQUERADE
+
+# Add peers below
 EOF
 
 echo "[*] Server setup complete!"
