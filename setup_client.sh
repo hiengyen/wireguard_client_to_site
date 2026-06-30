@@ -53,6 +53,20 @@ echo "
 PublicKey = ${CLIENT_PUB_KEY}
 AllowedIPs = 10.8.0.2/32
 "
-echo "To connect to the VPN, copy client_${WG_IFACE}.conf to /etc/wireguard/ (requires root) and run: sudo wg-quick up client_${WG_IFACE}"
-echo "Once connected, you can SSH into the server using: ssh user@10.8.0.1"
+
+read -p "Do you want to copy client_${WG_IFACE}.conf to /etc/wireguard/ on this machine now? (y/n): " confirm
+if [[ $confirm =~ ^[Yy]$ ]]; then
+    echo "[*] Copying configuration to /etc/wireguard/..."
+    sudo cp client_${WG_IFACE}.conf /etc/wireguard/
+    sudo chmod 600 /etc/wireguard/client_${WG_IFACE}.conf
+    read -p "Do you want to start the WireGuard client interface now? (y/n): " start_confirm
+    if [[ $start_confirm =~ ^[Yy]$ ]]; then
+        sudo wg-quick up client_${WG_IFACE}
+        echo "Once connected, you can SSH into the server using: ssh user@10.8.0.1"
+    fi
+else
+    echo "To connect to the VPN later:"
+    echo "1. sudo cp client_${WG_IFACE}.conf /etc/wireguard/"
+    echo "2. sudo wg-quick up client_${WG_IFACE}"
+fi
 echo "======================================"
