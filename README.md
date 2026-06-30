@@ -9,7 +9,7 @@ Tài liệu này hướng dẫn cách sử dụng hai script setup_server.sh và
    sudo apt update && sudo apt install -y wireguard
 
 2. Cấp quyền thực thi cho các script:
-   chmod +x setup_server.sh setup_client.sh
+   chmod +x setup_server.sh setup_client.sh uninstall.sh
 
 ## Các bước thiết lập
 
@@ -66,3 +66,15 @@ Tài liệu này hướng dẫn cách sử dụng hai script setup_server.sh và
 
 Để ngắt kết nối trên máy khách, dùng lệnh:
 sudo wg-quick down client_wg0
+
+## Gỡ bỏ cấu hình (Uninstall)
+
+Để gỡ bỏ cấu hình WireGuard và xóa các tệp khóa đã tạo, bạn có thể chạy script `uninstall.sh`:
+```bash
+./uninstall.sh
+```
+
+Script này sẽ:
+- Dừng giao diện kết nối WireGuard (cả Client hoặc Server nếu đang chạy).
+- Xóa tệp cấu hình tương ứng trong `/etc/wireguard/`.
+- Dọn dẹp sạch sẽ các tệp khóa (`.key`) và tệp cấu hình tạo ra trong thư mục hiện tại.
