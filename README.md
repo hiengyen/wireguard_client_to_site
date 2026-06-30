@@ -22,7 +22,7 @@ Tài liệu này hướng dẫn cách sử dụng hai script setup_server.sh và
    - Tạo ra các file khóa: server_private.key, server_public.key
    - Tạo ra file cấu hình: wg0.conf
    - Hiển thị khóa công khai của Server (Server Public Key) trên màn hình. Hãy lưu lại khóa này để dùng cấu hình cho máy khách.
-   - Hỏi bạn có muốn tự động sao chép cấu hình vào `/etc/wireguard/` và khởi động WireGuard ngay lập tức hay không. Nếu bạn đồng ý (y), script sẽ thực hiện tự động bằng quyền sudo.
+   - Tự động sao chép cấu hình vào `/etc/wireguard/` và khởi động WireGuard ngay lập tức bằng quyền sudo.
 
 2. Mở cổng (Port Forwarding) trên Modem/Router:
    - Đăng nhập vào giao diện quản lý modem/router của nhà mạng.
@@ -40,7 +40,7 @@ Tài liệu này hướng dẫn cách sử dụng hai script setup_server.sh và
    - Tạo ra các khóa cho client: client_private.key, client_public.key
    - Tạo ra file cấu hình: client_wg0.conf
    - In ra màn hình khối cấu hình dạng [Peer] chứa khóa công khai của máy khách. Hãy sao chép khối thông tin này để đăng ký với Server ở bước sau.
-   - Hỏi bạn có muốn tự động sao chép file cấu hình client_wg0.conf vào thư mục `/etc/wireguard/` và kích hoạt kết nối VPN trên máy khách hay không.
+   - Tự động sao chép file cấu hình client_wg0.conf vào thư mục `/etc/wireguard/` và kích hoạt kết nối VPN trên máy khách bằng quyền sudo.
 
 ### Bước 3: Đăng ký Client với Server
 
@@ -58,10 +58,7 @@ Tài liệu này hướng dẫn cách sử dụng hai script setup_server.sh và
 
 ### Bước 4: Kiểm tra kết nối từ Client
 
-1. Nếu bạn đã chọn tự động kích hoạt kết nối ở Bước 2, kết nối VPN đã được thiết lập.
-   Nếu chưa, bạn có thể thực hiện thủ công:
-   sudo cp client_wg0.conf /etc/wireguard/
-   sudo wg-quick up client_wg0
+1. Kết nối VPN đã được tự động thiết lập và chạy bằng quyền sudo.
 
 2. Kiểm tra kết nối bằng cách ping hoặc kết nối SSH đến máy chủ thông qua địa chỉ IP VPN (10.8.0.1):
    ping 10.8.0.1

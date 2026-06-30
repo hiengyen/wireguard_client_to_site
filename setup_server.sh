@@ -43,18 +43,11 @@ echo "Server Public Key (Share this with clients):"
 echo "  ${SERVER_PUB_KEY}"
 echo ""
 
-read -p "Do you want to copy ${WG_IFACE}.conf to /etc/wireguard/ and start WireGuard now? (y/n): " confirm
-if [[ $confirm =~ ^[Yy]$ ]]; then
-    echo "[*] Copying configuration to /etc/wireguard/..."
-    sudo cp ${WG_IFACE}.conf /etc/wireguard/
-    sudo chmod 600 /etc/wireguard/${WG_IFACE}.conf
-    echo "[*] Starting WireGuard interface ${WG_IFACE}..."
-    sudo wg-quick up ${WG_IFACE}
-else
-    echo "To start manually later:"
-    echo "1. sudo cp ${WG_IFACE}.conf /etc/wireguard/"
-    echo "2. sudo wg-quick up ${WG_IFACE}"
-fi
+echo "[*] Copying configuration to /etc/wireguard/..."
+sudo cp ${WG_IFACE}.conf /etc/wireguard/
+sudo chmod 600 /etc/wireguard/${WG_IFACE}.conf
+echo "[*] Starting WireGuard interface ${WG_IFACE}..."
+sudo wg-quick up ${WG_IFACE}
 
 echo ""
 echo "IMPORTANT: To allow clients to connect to this server from outside:"
