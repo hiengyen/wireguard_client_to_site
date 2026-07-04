@@ -1,79 +1,153 @@
 # Hướng dẫn thiết lập WireGuard Client-to-Site
 
-Tài liệu này hướng dẫn cách sử dụng hai script setup_server.sh và setup_client.sh để thiết lập hệ thống VPN WireGuard kết nối từ máy khách (Client) về máy chủ (Server/Site).
+Tài liệu này hướng dẫn chi tiết cách cài đặt, cấu hình và quản lý kết nối VPN WireGuard "Client-to-Site" sử dụng bộ công cụ tự động hóa gồm ba script: `setup_server.sh`, `setup_client.sh` và `uninstall.sh`.
 
-## Yêu cầu trước khi thiết lập
+---
 
-1. Cả máy chủ (Server) và máy khách (Client) cần được cài đặt WireGuard.
-   Ví dụ trên Ubuntu/Debian:
-   sudo apt update && sudo apt install -y wireguard
+## 1. Yêu cầu trước khi thiết lập (Prerequisites)
 
-2. Cấp quyền thực thi cho các script:
-   chmod +x setup_server.sh setup_client.sh uninstall.sh
+### Bước A: Cài đặt WireGuard trên cả Server và Client
 
-## Các bước thiết lập
+* **Ubuntu / Debian:**
+  ```bash
+  sudo apt update && sudo apt install -y wireguard curl
+  ```
+* **CentOS / RHEL / Rocky Linux:**
+  ```bash
+  sudo dnf install -y epel-release
+  sudo dnf install -y wireguard-tools curl
+  ```
+
+### Bước B: Cấp quyền thực thi cho các script
+Tải bộ script về máy và chạy lệnh sau trong thư mục chứa script trên cả 2 máy:
+```bash
+chmod +x setup_server.sh setup_client.sh uninstall.sh
+```
+
+---
+
+## 2. Quy trình thiết lập chi tiết
+
+```mermaid
+graph TD
+    A[Chạy setup_server.sh trên Server] -->|Tạo wg0.conf với placeholder| B[Mở cổng UDP 51820 trên Modem]
+    B --> C[Chạy setup_client.sh trên Client]
+    C -->|Cách 1: Đồng bộ qua SSH| D[Tự động cập nhật Public Key lên Server & Reload]
+    C -->|Cách 2: Thủ công| E[Copy Public Key thủ công vào /etc/wireguard/wg0.conf]
+    D --> F[Bật VPN kết nối thành công]
+    E -->|Chạy wg syncconf trên Server| F
+```
 
 ### Bước 1: Cấu hình trên máy chủ (Server)
 
-1. Chạy script `setup_server.sh` trên máy chủ:
+1. Chạy script cài đặt máy chủ:
+   ```bash
    ./setup_server.sh
+   ```
 
-   Sau khi chạy, script sẽ:
-   - Tạo ra các tệp khóa của Server (`server_private.key`, `server_public.key`).
-   - Tạo ra cấu hình máy chủ `wg0.conf` có sẵn phần khai báo peer `Client1 EdgeNode` với IP `10.8.0.2/32` (Khóa công khai của client tạm thời được gán bằng giá trị placeholder).
-   - Tự động sao chép cấu hình `wg0.conf` vào `/etc/wireguard/` và khởi động WireGuard ngay lập tức bằng quyền sudo.
+   **Kết quả sau khi chạy thành công:**
+   - Sinh cặp khóa cho máy chủ (`server_private.key`, `server_public.key`).
+   - Tạo file cấu hình máy chủ tại `/etc/wireguard/wg0.conf` với block `[Peer]` được cấu hình sẵn cho `Client1 EdgeNode` (IP `10.8.0.2/32`), khóa công khai tạm thời để dạng placeholder.
+   - Tự động nạp cấu hình và khởi chạy dịch vụ WireGuard trên máy chủ bằng quyền `sudo`.
+   - Hiển thị thông tin **Server Public Key** lên màn hình. Hãy lưu lại thông tin này để cấu hình cho máy khách ở bước sau.
 
-2. Mở cổng (Port Forwarding) trên Modem/Router:
-   - Đăng nhập vào giao diện quản lý modem/router của nhà mạng.
-   - Cấu hình Port Forwarding cổng UDP 51820 trỏ về địa chỉ IP LAN của máy chủ.
+2. **Cấu hình NAT/Port Forwarding trên Modem/Router nhà mạng:**
+   - Truy cập trang quản trị Modem/Router của bạn.
+   - Forward cổng **UDP 51820** trỏ về địa chỉ IP LAN nội bộ của máy chủ (ví dụ: `192.168.1.100`).
 
-### Bước 2: Cấu hình trên máy khách (Client) và đăng ký khóa
+---
 
-1. Chạy script `setup_client.sh` trên máy khách. Bạn truyền thêm địa chỉ IP công khai của Server, Server Public Key, và (tùy chọn) thông tin SSH để tự động đồng bộ khóa lên máy chủ:
-   ./setup_client.sh <server_public_ip_or_domain> <server_public_key> [server_ssh_user] [server_ssh_port]
+### Bước 2: Cấu hình trên máy khách (Client) & Đồng bộ khóa
 
-   Ví dụ (tự động đăng ký qua SSH):
-   ./setup_client.sh 203.0.113.5 abcdef1234567890... hiengyen 22
+Chạy script cài đặt máy khách trên máy Client. Cú pháp chạy lệnh đầy đủ như sau:
 
-   Sau khi chạy, script sẽ:
-   - Tạo khóa và cấu hình `client_wg0.conf` mới cho máy khách sử dụng IP tĩnh `10.8.0.2/32` (và các thông số DNS=1.1.1.1, ListenPort=51820).
-   - Tự động SSH vào máy chủ để thay thế khóa công khai thực tế của client vào block cấu hình `Client1 EdgeNode` đã tạo ở Bước 1 và tải lại cấu hình server.
-   - Tự động sao chép file cấu hình client_wg0.conf vào thư mục `/etc/wireguard/` và kích hoạt kết nối VPN bằng quyền sudo.
+```bash
+./setup_client.sh <SERVER_PUBLIC_IP_OR_DOMAIN> <SERVER_PUBLIC_KEY> [SSH_USER] [SSH_PORT]
+```
 
-### Bước 3: Đăng ký khóa thủ công (Nếu không tự động đồng bộ qua SSH ở Bước 2)
+* **`<SERVER_PUBLIC_IP_OR_DOMAIN>`**: IP WAN công khai hoặc tên miền DDNS trỏ về Modem của Server.
+* **`<SERVER_PUBLIC_KEY>`**: Khóa công khai của Server (in ra ở Bước 1).
+* **`[SSH_USER]`** (Tùy chọn): Tên đăng nhập SSH của Server để tự động trao đổi khóa.
+* **`[SSH_PORT]`** (Tùy chọn, mặc định là 22): Cổng SSH của Server.
 
-Nếu chọn không đồng bộ khóa tự động qua SSH ở Bước 2, bạn cần cập nhật thủ công trên máy chủ:
-1. Quay lại máy chủ (Server), mở file cấu hình `/etc/wireguard/wg0.conf` để chỉnh sửa:
+#### Trường hợp A: Đồng bộ khóa tự động qua SSH (Khuyên dùng)
+Nếu bạn cung cấp thông tin SSH của Server khi chạy lệnh, script sẽ tự động ghi khóa công khai thực tế của client vào file cấu hình trên máy chủ và tải lại dịch vụ:
+```bash
+./setup_client.sh 203.0.113.5 abcdef1234567890... hiengyen 22
+```
+
+#### Trường hợp B: Đăng ký khóa thủ công (Khi không dùng SSH)
+Nếu bạn chạy lệnh không có tham số SSH hoặc việc kết nối SSH không thành công:
+```bash
+./setup_client.sh 203.0.113.5 abcdef1234567890...
+```
+Script sẽ sinh khóa, tạo tệp cấu hình client, khởi chạy dịch vụ client, và in ra mã khóa công khai của client. Bạn cần cập nhật khóa này lên máy chủ theo hướng dẫn ở **Bước 3**.
+
+---
+
+### Bước 3: Đăng ký khóa thủ công trên Server (Nếu thực hiện theo Trường hợp B)
+
+1. Trên máy chủ (Server), mở tệp cấu hình WireGuard để chỉnh sửa:
+   ```bash
    sudo nano /etc/wireguard/wg0.conf
-
-2. Tìm đoạn cấu hình `[Peer]` của `Client1 EdgeNode` và dán khóa công khai của client (được in ra ở cuối Bước 2) vào phần `PublicKey`:
+   ```
+2. Tìm đến block cấu hình `[Peer]` của `Client1 EdgeNode` và cập nhật khóa công khai của client vừa tạo vào phần `PublicKey`:
+   ```ini
    [Peer]
    # Client1  EdgeNode
-   PublicKey  = <KHOA_CONG_KHAI_CUA_CLIENT>
+   PublicKey  = <DÁN_KHÓA_CÔNG_KHAI_CỦA_CLIENT_VÀO_ĐÂY>
    AllowedIPs = 10.8.0.2/32
-
-3. Tải lại cấu hình trên máy chủ để áp dụng thay đổi:
+   ```
+3. Lưu lại tệp cấu hình và chạy lệnh sau trên máy chủ để áp dụng cài đặt mới mà không làm gián đoạn kết nối hiện tại:
+   ```bash
    sudo wg syncconf wg0 <(sudo wg-quick strip wg0)
+   ```
 
-### Bước 4: Kiểm tra kết nối từ Client
+---
 
-1. Kết nối VPN đã được tự động thiết lập và chạy bằng quyền sudo.
+## 3. Quản lý dịch vụ & Kiểm tra kết nối
 
-2. Kiểm tra kết nối bằng cách ping hoặc kết nối SSH đến máy chủ thông qua địa chỉ IP VPN (10.8.0.1):
-   ping 10.8.0.1
-   ssh user@10.8.0.1
+### Kiểm tra trạng thái kết nối
+* **Trên cả Server và Client:**
+  ```bash
+  sudo wg show
+  ```
+* **Kiểm tra ping từ máy khách về máy chủ:**
+  ```bash
+  ping -c 4 10.8.0.1
+  ```
 
-Để ngắt kết nối trên máy khách, dùng lệnh:
-sudo wg-quick down client_wg0
+### Điều khiển dịch vụ thủ công
 
-## Gỡ bỏ cấu hình (Uninstall)
+* **Bật/Tắt kết nối trên máy chủ (Server):**
+  ```bash
+  # Tắt kết nối
+  sudo wg-quick down wg0
+  
+  # Bật kết nối
+  sudo wg-quick up wg0
+  ```
 
-Để gỡ bỏ cấu hình WireGuard và xóa các tệp khóa đã tạo, bạn có thể chạy script `uninstall.sh`:
+* **Bật/Tắt kết nối trên máy khách (Client):**
+  ```bash
+  # Tắt kết nối
+  sudo wg-quick down client_wg0
+  
+  # Bật kết nối
+  sudo wg-quick up client_wg0
+  ```
+
+---
+
+## 4. Gỡ bỏ hoàn toàn cấu hình (Uninstall)
+
+Khi không còn nhu cầu sử dụng, bạn có thể dọn dẹp sạch sẽ dịch vụ WireGuard bằng script `uninstall.sh`. Chạy lệnh sau trên máy chủ hoặc máy khách để gỡ cài đặt:
+
 ```bash
 ./uninstall.sh
 ```
 
-Script này sẽ:
-- Dừng giao diện kết nối WireGuard (cả Client hoặc Server nếu đang chạy).
-- Xóa tệp cấu hình tương ứng trong `/etc/wireguard/`.
-- Dọn dẹp sạch sẽ các tệp khóa (`.key`) và tệp cấu hình tạo ra trong thư mục hiện tại.
+**Các tác vụ script này thực hiện:**
+- Tự động dừng giao diện mạng Wireguard đang hoạt động (`wg0` hoặc `client_wg0`).
+- Xóa bỏ các tệp cấu hình tương ứng trong `/etc/wireguard/`.
+- Xóa bỏ các tệp khóa (`.key`) và tệp cấu hình nháp được tạo ra trong thư mục cài đặt hiện hành.
